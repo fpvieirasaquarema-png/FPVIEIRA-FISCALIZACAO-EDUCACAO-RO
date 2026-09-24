@@ -3,85 +3,155 @@
   "nodes": [
     {
       "parameters": {
-        "rule": { "interval": [ { "field": "minutes", "minutesInterval": 2 } ] }
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
       },
       "id": "a1000000-0000-0000-0000-000000000001",
       "name": "A cada 2 min",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
         "url": "https://irprgdzaqoqnjuksuloh.supabase.co/rest/v1/os_fiscalizacao",
         "sendQuery": true,
-        "queryParameters": { "parameters": [
-          { "name": "select", "value": "id,numero,unidade,area,nivel,assunto,descricao,fiscal,emitida_por,data_abertura" },
-          { "name": "notificado_em", "value": "is.null" },
-          { "name": "numero", "value": "gte.2401" },
-          { "name": "cancelada", "value": "eq.false" },
-          { "name": "order", "value": "numero.asc" },
-          { "name": "limit", "value": "1" }
-        ] },
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "id,numero,unidade,area,nivel,assunto,descricao,fiscal,emitida_por,data_abertura"
+            },
+            {
+              "name": "notificado_em",
+              "value": "is.null"
+            },
+            {
+              "name": "numero",
+              "value": "gte.2401"
+            },
+            {
+              "name": "cancelada",
+              "value": "eq.false"
+            },
+            {
+              "name": "order",
+              "value": "numero.asc"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
         "sendHeaders": true,
-        "headerParameters": { "parameters": [
-          { "name": "apikey", "value": "COLE_AQUI_A_SERVICE_KEY" },
-          { "name": "Authorization", "value": "Bearer COLE_AQUI_A_SERVICE_KEY" }
-        ] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "COLE_AQUI_A_SERVICE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer COLE_AQUI_A_SERVICE_KEY"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "a1000000-0000-0000-0000-000000000002",
       "name": "Busca O.S. nao notificadas",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const JID_GRUPO_RENATO = 'COLE_AQUI_JID_GRUPO_RENATO';\nconst JID_GRUPO_WELLINGTON = 'COLE_AQUI_JID_GRUPO_WELLINGTON';\nconst JID_GRUPO_PADRAO = 'COLE_AQUI_JID_GRUPO_PADRAO';\nfunction grupoDoFiscal(f){ f = String(f||'').toLowerCase(); if(f.includes('renato')) return JID_GRUPO_RENATO; if(f.includes('welling')) return JID_GRUPO_WELLINGTON; return JID_GRUPO_PADRAO; }\nconst brutos = $input.all().map(i => i.json);\nconst lista = (brutos.length === 1 && Array.isArray(brutos[0])) ? brutos[0] : brutos;\nreturn lista.filter(o => o && o.numero).map(o => ({ json: {\n  ...o,\n  grupoJid: grupoDoFiscal(o.fiscal),\n  link: 'https://irprgdzaqoqnjuksuloh.supabase.co/storage/v1/object/public/os-oficiais/os-' + o.numero + '.xlsx',\n  nomeArquivo: 'OS ' + o.numero + ' - ' + String(o.assunto||'').toUpperCase().replace(/[\\\\/:*?\"<>|]/g,'-') + ' - ' + o.area + ' - ' + String(o.unidade||'').replace(/[\\\\/:*?\"<>|]/g,'-') + '.xlsx',\n  resumo: 'O.S. ' + o.numero + ' \u2014 ' + o.unidade + '\\n\u00c1rea: ' + o.area + ' \u00b7 N\u00edvel ' + o.nivel + '\\nAssunto: ' + o.assunto + '\\nServi\u00e7o: ' + o.descricao + '\\nAbertura: ' + String(o.data_abertura||'').split('-').reverse().join('/') + ' \u00b7 Fiscal: ' + (o.fiscal||'') + '\\nEmitida por: ' + (o.emitida_por||'')\n} }));"
+        "jsCode": "// JIDs verificados em 11/09/2026 via GET /group/fetchAllGroups (id único por nome)\nconst JID_GRUPO_RENATO = '120363425586360506@g.us';      // RDO - Equipe Emergencial Renato\nconst JID_GRUPO_WELLINGTON = '120363407044425576@g.us';  // RDO - Equipe Emergencial Wellington\nconst JID_GRUPO_PADRAO = '120363405209036533@g.us';      // RDO - Manutenção Preventiva/Emergencial\nconst APP_CAMPO = 'https://fpvieira.vercel.app';\nfunction grupoDoFiscal(f){ f = String(f||'').toLowerCase(); if(f.includes('renato')) return JID_GRUPO_RENATO; if(f.includes('welling')) return JID_GRUPO_WELLINGTON; return JID_GRUPO_PADRAO; }\n// deep link: o colaborador clica no grupo e cai no app de campo com a O.S.\n// já preenchida (v109 do FPV-Campo lê ?os=&un=&ar=&ni=&as=&de=&fi=&dt=)\nfunction linkApp(o){\n  const par = [];\n  const poe = (k, v) => { v = String(v == null ? '' : v).trim(); if(v) par.push(k + '=' + encodeURIComponent(v)); };\n  poe('os', o.numero);\n  poe('un', o.unidade);\n  poe('ar', o.area);\n  poe('ni', o.nivel);\n  poe('as', o.assunto);\n  poe('de', Array.from(String(o.descricao||'')).slice(0, 350).join('')); // corte por code point: emoji na fronteira NAO derruba o encodeURIComponent (e a fila)\n  poe('fi', o.fiscal);\n  poe('dt', String(o.data_abertura||'').slice(0, 10));\n  return APP_CAMPO + '/?' + par.join('&');\n}\nconst brutos = $input.all().map(i => i.json);\nconst lista = (brutos.length === 1 && Array.isArray(brutos[0])) ? brutos[0] : brutos;\nreturn lista.filter(o => o && o.numero).map(o => {\n  const resumo = 'O.S. ' + o.numero + ' — ' + o.unidade + '\\nÁrea: ' + o.area + ' · Nível ' + o.nivel + '\\nAssunto: ' + o.assunto + '\\nServiço: ' + o.descricao + '\\nAbertura: ' + String(o.data_abertura||'').split('-').reverse().join('/') + ' · Fiscal: ' + (o.fiscal||'') + '\\nEmitida por: ' + (o.emitida_por||'');\n  return { json: {\n    ...o,\n    grupoJid: grupoDoFiscal(o.fiscal),\n    link: 'https://irprgdzaqoqnjuksuloh.supabase.co/storage/v1/object/public/os-oficiais/os-' + o.numero + '.xlsx',\n    nomeArquivo: 'OS ' + o.numero + ' - ' + String(o.assunto||'').toUpperCase().replace(/[\\\\/:*?\"<>|]/g,'-') + ' - ' + o.area + ' - ' + String(o.unidade||'').replace(/[\\\\/:*?\"<>|]/g,'-') + '.xlsx',\n    resumo: resumo,\n    caption: resumo + '\\n\\n\\ud83d\\udcf2 Registrar a execução no app: ' + linkApp(o)\n  } };\n});"
       },
       "id": "a1000000-0000-0000-0000-000000000003",
       "name": "Prepara itens",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
         "url": "={{ $json.link }}",
-        "options": { "response": { "response": { "responseFormat": "file", "outputPropertyName": "data" } } }
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
       },
       "id": "a1000000-0000-0000-0000-000000000004",
       "name": "Baixa a planilha (Storage)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
         "sendTo": "fp.edu.riodasostras@gmail.com",
         "subject": "=OS {{ $json.numero }}",
         "emailType": "text",
-        "message": "={{ $json.resumo }}\n\nPlanilha oficial em anexo (emitida pelo app da Fiscaliza\u00e7\u00e3o SEMDE).",
+        "message": "={{ $json.resumo }}\n\nPlanilha oficial em anexo (emitida pelo app da Fiscalização SEMDE).",
         "options": {
-          "attachmentsUi": { "attachmentsBinary": [ { "property": "data" } ] }
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "data"
+              }
+            ]
+          }
         }
       },
       "id": "a1000000-0000-0000-0000-000000000005",
       "name": "E-mail oficial COM ANEXO",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [880, -100]
+      "position": [
+        880,
+        -100
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "COLE_AQUI_EVOLUTION_URL/message/sendMedia/COLE_AQUI_INSTANCIA",
+        "url": "https://evo.editly.com.br/message/sendMedia/Renanfp",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [ { "name": "apikey", "value": "COLE_AQUI_EVOLUTION_APIKEY" } ] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "COLE_AQUI_EVOLUTION_APIKEY"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $json.grupoJid, mediatype: 'document', mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', media: $json.link, fileName: $json.nomeArquivo, caption: $json.resumo }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $json.grupoJid, mediatype: 'document', mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', media: $json.link, fileName: $json.nomeArquivo, caption: $json.caption }) }}",
         "options": {}
       },
       "id": "a1000000-0000-0000-0000-000000000006",
@@ -89,18 +159,32 @@
       "name": "WhatsApp do grupo (Evolution)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, 100]
+      "position": [
+        880,
+        100
+      ]
     },
     {
       "parameters": {
         "method": "PATCH",
         "url": "=https://irprgdzaqoqnjuksuloh.supabase.co/rest/v1/os_fiscalizacao?id=eq.{{ $('Prepara itens').item.json.id }}",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [
-          { "name": "apikey", "value": "COLE_AQUI_A_SERVICE_KEY" },
-          { "name": "Authorization", "value": "Bearer COLE_AQUI_A_SERVICE_KEY" },
-          { "name": "Content-Type", "value": "application/json" }
-        ] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "COLE_AQUI_A_SERVICE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer COLE_AQUI_A_SERVICE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ notificado_em: new Date().toISOString() }) }}",
@@ -110,16 +194,81 @@
       "name": "Marca como notificada",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ]
     }
   ],
   "connections": {
-    "A cada 2 min": { "main": [ [ { "node": "Busca O.S. nao notificadas", "type": "main", "index": 0 } ] ] },
-    "Busca O.S. nao notificadas": { "main": [ [ { "node": "Prepara itens", "type": "main", "index": 0 } ] ] },
-    "Prepara itens": { "main": [ [ { "node": "Baixa a planilha (Storage)", "type": "main", "index": 0 } ] ] },
-    "Baixa a planilha (Storage)": { "main": [ [ { "node": "E-mail oficial COM ANEXO", "type": "main", "index": 0 } ] ] },
-    "E-mail oficial COM ANEXO": { "main": [ [ { "node": "WhatsApp do grupo (Evolution)", "type": "main", "index": 0 } ] ] },
-    "WhatsApp do grupo (Evolution)": { "main": [ [ { "node": "Marca como notificada", "type": "main", "index": 0 } ] ] }
+    "A cada 2 min": {
+      "main": [
+        [
+          {
+            "node": "Busca O.S. nao notificadas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca O.S. nao notificadas": {
+      "main": [
+        [
+          {
+            "node": "Prepara itens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara itens": {
+      "main": [
+        [
+          {
+            "node": "Baixa a planilha (Storage)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixa a planilha (Storage)": {
+      "main": [
+        [
+          {
+            "node": "E-mail oficial COM ANEXO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E-mail oficial COM ANEXO": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp do grupo (Evolution)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp do grupo (Evolution)": {
+      "main": [
+        [
+          {
+            "node": "Marca como notificada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }

@@ -660,7 +660,29 @@ function nomeArquivo(os){
   const limpa = s => String(s||'').replace(/[\\/:*?"<>|]/g,'-').trim();
   return 'OS '+os.numero+' - '+limpa(os.assunto).toUpperCase()+' - '+os.area+' - '+limpa(os.unidade)+'.xlsx';
 }
-function resumoOS(os){
+/* v11: LINK DO APP DE CAMPO (pedido do Renan 24/09) — no WhatsApp o link da
+   planilha dá lugar a um link que abre o app da contratada com a O.S. já
+   preenchida: o colaborador clica no grupo, registra a execução (fotos/
+   serviço) e compartilha de volta. O e-mail segue com a planilha oficial.
+   encodeURIComponent por valor é OBRIGATÓRIO (URLSearchParams cuida): acento
+   ou espaço cru dentro da URL faz o WhatsApp truncar o link. */
+const APP_CAMPO='https://fpvieira.vercel.app';
+function urlApp(os){
+  const p=new URLSearchParams();
+  p.set('os', os.numero);
+  if(os.unidade) p.set('un', os.unidade);
+  if(os.area) p.set('ar', os.area);
+  if(os.nivel) p.set('ni', os.nivel);
+  if(os.assunto) p.set('as', os.assunto);
+  if(os.descricao) p.set('de', Array.from(String(os.descricao)).slice(0,350).join('')); // corte por code point: emoji nunca fica pela metade; o grupo já leva o texto completo
+  if(os.fiscal) p.set('fi', os.fiscal);
+  if(os.dataAbertura) p.set('dt', String(os.dataAbertura).slice(0,10));
+  return APP_CAMPO+'/?'+p.toString();
+}
+function resumoOS(os, alvo){ // alvo 'app' = WhatsApp (link do app de campo); demais = planilha
+  const cauda = alvo==='app'
+    ? '\n\n📲 Registrar a execução no app: '+urlApp(os)
+    : (nuvemOK()? '\n\n📎 Planilha oficial: '+urlPlanilha(os) : '');
   return 'O.S. '+os.numero+' — '+os.unidade+'\n'
     +'Área: '+os.area+' · Nível '+os.nivel+'\n'
     +'Assunto: '+os.assunto+'\n'
@@ -668,7 +690,7 @@ function resumoOS(os){
     +(os.prazo? 'Prazo: '+prazoTxt(os)+'\n' : '')
     +'Abertura: '+br(os.dataAbertura)+(os.fiscal? ' · Fiscal: '+os.fiscal : '')
     +(os.origem? '\nPedido de origem: '+os.origem : '')
-    +(nuvemOK()? '\n\n📎 Planilha oficial: '+urlPlanilha(os) : '');
+    +cauda;
 }
 /* link público da planilha no Storage — funciona em QUALQUER celular,
    inclusive no navegador interno do WhatsApp (onde anexar é impossível) */
@@ -997,10 +1019,14 @@ async function shareWhats(os){
   const u8=xlsxOS(os);
   const subiu=await subirPlanilha(os, u8);            // garante o LINK antes de compartilhar
   if(subiu) avisaRobo();                              // se essa O.S. ainda não foi notificada, o robô cobre
-  const ok=await compartilharArquivo(u8, nomeArquivo(os), resumoOS(os));
+  const ok=await compartilharArquivo(u8, nomeArquivo(os), resumoOS(os,'app'));
   if(!ok){
     if(nuvemOK() && !subiu) toast('⚠ Link da planilha ainda indisponível — peça ao administrador para liberar o armazenamento');
-    window.open('https://wa.me/?text='+encodeURIComponent(resumoOS(os)),'_blank');
+    window.open('https://wa.me/?text='+encodeURIComponent(resumoOS(os,'app')),'_blank');
+  }else{
+    // alguns WhatsApp Android DESCARTAM o texto quando vai arquivo junto — o
+    // resumo com o link fica copiado p/ colar na conversa se isso acontecer
+    try{ await navigator.clipboard.writeText(resumoOS(os,'app')); toast('Texto com o link do app COPIADO — se não foi junto do arquivo, é só colar na conversa'); }catch(e){}
   }
 }
 async function shareEmail(os){
