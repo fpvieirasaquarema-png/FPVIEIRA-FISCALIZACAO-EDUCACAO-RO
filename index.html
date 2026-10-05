@@ -208,7 +208,7 @@ nav button.sel .ic{transform:translateY(-1px)}
       <!-- v12: versão SEMPRE visível — diagnóstico de app desatualizado no
            celular (caso Cassio 29/09: compartilhava sem o link do app porque
            o aparelho rodava uma cópia antiga; sem selo não dava p/ saber) -->
-      <small>Fiscalização · Manutenção Predial · <span style="opacity:.55">v12</span></small><button type="button" id="hd-user" hidden title="Sair e voltar à tela inicial"></button><br>
+      <small>Fiscalização · Manutenção Predial · <span style="opacity:.55">v13</span></small><button type="button" id="hd-user" hidden title="Sair e voltar à tela inicial"></button><br>
       <span class="prox-pill">Próxima: <b id="hd-prox">—</b></span>
     </div>
   </div>
@@ -221,7 +221,7 @@ nav button.sel .ic{transform:translateY(-1px)}
     <svg class="login-logo" viewBox="0 0 340 436" role="img" aria-label="Prefeitura de Rio das Ostras — Governando com Responsabilidade"><use href="#logo-pmro"/></svg>
     <div class="login-tit">
       <h2>Emissor de Ordem de Serviço</h2>
-      <small>Fiscalização · Manutenção Predial · <span style="opacity:.55">v12</span></small>
+      <small>Fiscalização · Manutenção Predial · <span style="opacity:.55">v13</span></small>
     </div>
     <div class="login-users" id="login-users"></div>
     <div class="login-senha" id="login-senha">
@@ -943,6 +943,13 @@ function poeCel(xml, ref, valor, num){
 }
 function xlsxOS(os){
   let sh = dec8.decode(b64paraU8(TEMPLATE_OS['xl/worksheets/sheet1.xml']));
+  // IMPRESSÃO EM 1 PÁGINA SEMPRE (pedido do Renan 05/10): o molde oficial vem
+  // com escala FIXA de 61% — no Excel as alturas de linha são fixas e cabe,
+  // mas leitor que recalcula altura (impressão pela visualização do Drive/
+  // Google Sheets) estoura pra 2ª página quando descrição/observação são
+  // longas. Com fitToPage a escala é recalculada pelo conteúdo e trava em 1.
+  sh = sh.replace('</x:sheetPr>', '<x:pageSetUpPr fitToPage="1"/></x:sheetPr>');
+  sh = sh.replace(/ scale="\d+"/, ' fitToWidth="1" fitToHeight="1"');
   sh = poeCel(sh, 'H9', br(os.dataAbertura));
   sh = poeCel(sh, 'J9', '', os.numero);
   if(os.codigo) sh = poeCel(sh, 'L9', os.codigo);
@@ -1468,6 +1475,42 @@ $('#login-esqueci').onclick=()=>{
   if(nuvemOK()){ toast('Peça ao administrador para redefinir sua senha no painel do servidor'); return; }
   const p=$('#login-reset'); p.hidden=!p.hidden;
 };
+/* v13: o app se DENUNCIA quando está velho (caso Cassio 29/09–05/10: ele
+   compartilhava sem o link porque o aparelho rodava cópia antiga, e não
+   havia como ver isso de fora).
+   - cópia salva (file://) ou demonstração: aviso permanente com o endereço
+     oficial;
+   - aba velha no navegador: compara com versao.txt do servidor ao abrir e
+     toda vez que a aba volta ao primeiro plano; diferente → botão Atualizar. */
+const APP_VER='13';
+const URL_OFICIAL='https://fpvieira-fiscalizacao-educacao-ro-seven.vercel.app';
+function bannerVersao(html){
+  let b=document.getElementById('aviso-versao');
+  if(!b){
+    b=document.createElement('div'); b.id='aviso-versao';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999;background:#B3261E;color:#fff;font:700 13.5px/1.4 system-ui,sans-serif;padding:10px 14px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+    document.body.appendChild(b);
+  }
+  b.innerHTML=html;
+}
+async function checaVersao(){
+  if(location.protocol==='file:' || /claude\.(ai|site)|claudeusercontent/.test(location.hostname)){
+    bannerVersao('⚠ Esta é uma CÓPIA do app (versão antiga, sem as novidades). Use o site oficial: <a href="'+URL_OFICIAL+'" style="color:#FFD966;font-weight:800">'+URL_OFICIAL.replace('https://','')+'</a>');
+    return;
+  }
+  try{
+    const r=await fetch('versao.txt?b='+Date.now(), {cache:'no-store'});
+    if(!r.ok) return;
+    const v=(await r.text()).trim();
+    if(/^\d+$/.test(v) && v!==APP_VER){
+      bannerVersao('🔄 Tem versão NOVA do app (v'+v+' — esta tela está na v'+APP_VER+').'
+        +'<button onclick="location.reload()" style="margin-left:10px;background:#fff;color:#B3261E;border:0;border-radius:99px;padding:5px 14px;font-weight:800;cursor:pointer">Atualizar agora</button>');
+    }
+  }catch(e){} // sem rede/arquivo: segue em silêncio
+}
+checaVersao();
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') checaVersao(); });
+
 $('#login-reset-conf').onclick=ev=>{
   doisToques(ev.currentTarget, 'Tocar de novo para confirmar', ()=>{
     st.cfg.usuarios.forEach(u=>u.senha=hashSenha(u.id+'26'));
